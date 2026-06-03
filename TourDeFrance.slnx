@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="TourDeFrance.Data/TourDeFrance.Data.csproj" />
+  <Project Path="TourDeFrance.Tests/TourDeFrance.Tests.csproj" />
+  <Project Path="TourDeFrance.Web/TourDeFrance.Web.csproj" />
+</Solution>

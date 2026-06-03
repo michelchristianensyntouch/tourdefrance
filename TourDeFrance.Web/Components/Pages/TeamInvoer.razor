@@ -1,0 +1,174 @@
+@page "/team-invoer"
+@using TourDeFrance.Data.Entities
+@using TourDeFrance.Web.Services
+@inject RennerService RennerService
+@inject DeelnemerService DeelnemerService
+@rendermode InteractiveServer
+
+<PageTitle>Team Samenstellen</PageTitle>
+
+<h1>📝 Team Samenstellen</h1>
+
+@if (!string.IsNullOrEmpty(succesmelding))
+{
+    <div class="alert alert-success alert-dismissible">
+        @succesmelding
+        <button type="button" class="btn-close" @onclick="() => succesmelding = string.Empty"></button>
+    </div>
+}
+@if (!string.IsNullOrEmpty(foutmelding))
+{
+    <div class="alert alert-danger alert-dismissible">
+        @foutmelding
+        <button type="button" class="btn-close" @onclick="() => foutmelding = string.Empty"></button>
+    </div>
+}
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Jouw gegevens</h5>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Naam deelnemer</label>
+                <input class="form-control" @bind="deelnemerNaam" placeholder="Jouw naam" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">E-mailadres (optioneel)</label>
+                <input class="form-control" @bind="deelnemerEmail" placeholder="email@voorbeeld.nl" type="email" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Renner selectie</h5>
+        <p class="text-muted">
+            Selecteer 15 renners via hun startnummer. De <strong>eerste 3 renners</strong> zijn 
+            jouw voorspelling voor het eindpodium (1e, 2e, 3e).
+        </p>
+
+        @for (int i = 0; i < 15; i++)
+        {
+            var index = i;
+            var label = index < 3 ? $"Positie {index + 1} (podiumvoorspelling)" : $"Renner {index + 1}";
+            var cls = index < 3 ? "border-warning" : "";
+
+            <div class="row align-items-center mb-2">
+                <div class="col-1 text-center fw-bold @(index < 3 ? "text-warning" : "")">
+                    @(index + 1).
+                </div>
+                <div class="col-md-2">
+                    <input class="form-control @cls" type="number" min="1"
+                           placeholder="Startnr"
+                           value="@startnummers[index]"
+                           @onchange="async e => await StartnummerGewijzigd(index, e)" />
+                </div>
+                <div class="col-md-4">
+                    @if (gevondenRenners[index] != null)
+                    {
+                        <span class="text-success fw-bold">@gevondenRenners[index]!.VolledigeNaam</span>
+                    }
+                    else if (startnummers[index].HasValue)
+                    {
+                        <span class="text-danger">Niet gevonden</span>
+                    }
+                </div>
+                <div class="col-md-4">
+                    @if (gevondenRenners[index] != null)
+                    {
+                        <span class="badge bg-secondary">@gevondenRenners[index]!.Ploeg.Naam</span>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="d-flex gap-2">
+    <button class="btn btn-primary btn-lg" @onclick="SlaTeamOp" disabled="@bezig">
+        @if (bezig) { <span class="spinner-border spinner-border-sm me-2"></span> }
+        💾 Team Opslaan
+    </button>
+    <button class="btn btn-outline-secondary" @onclick="Reset">Leegmaken</button>
+</div>
+
+@code {
+    private string deelnemerNaam = string.Empty;
+    private string deelnemerEmail = string.Empty;
+    private int?[] startnummers = new int?[15];
+    private Renner?[] gevondenRenners = new Renner?[15];
+    private string succesmelding = string.Empty;
+    private string foutmelding = string.Empty;
+    private bool bezig = false;
+
+    private async Task StartnummerGewijzigd(int index, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var nr))
+        {
+            startnummers[index] = nr;
+            gevondenRenners[index] = await RennerService.GetRennerByStartnummerAsync(nr);
+        }
+        else
+        {
+            startnummers[index] = null;
+            gevondenRenners[index] = null;
+        }
+    }
+
+    private async Task SlaTeamOp()
+    {
+        foutmelding = string.Empty;
+        succesmelding = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(deelnemerNaam))
+        {
+            foutmelding = "Vul je naam in.";
+            return;
+        }
+
+        var geldige = startnummers.Where(n => n.HasValue).Select(n => n!.Value).ToList();
+        if (geldige.Count != 15)
+        {
+            foutmelding = $"Je hebt {geldige.Count} renners geselecteerd. Je hebt er precies 15 nodig.";
+            return;
+        }
+
+        if (geldige.Distinct().Count() != 15)
+        {
+            foutmelding = "Je hebt dubbele startnummers ingevuld.";
+            return;
+        }
+
+        if (gevondenRenners.Any(r => r == null))
+        {
+            foutmelding = "Niet alle startnummers zijn geldig. Controleer de rode velden.";
+            return;
+        }
+
+        bezig = true;
+        try
+        {
+            var deelnemer = await DeelnemerService.MaakDeelnemerAanAsync(deelnemerNaam, deelnemerEmail);
+            await DeelnemerService.SlaTeamOpAsync(deelnemer.Id, geldige);
+            succesmelding = $"Team van {deelnemerNaam} is opgeslagen! 🎉";
+            Reset();
+        }
+        catch (Exception ex)
+        {
+            foutmelding = $"Fout bij opslaan: {ex.Message}";
+        }
+        finally
+        {
+            bezig = false;
+        }
+    }
+
+    private void Reset()
+    {
+        deelnemerNaam = string.Empty;
+        deelnemerEmail = string.Empty;
+        startnummers = new int?[15];
+        gevondenRenners = new Renner?[15];
+    }
+}

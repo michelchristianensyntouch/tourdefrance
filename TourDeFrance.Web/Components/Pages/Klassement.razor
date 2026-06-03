@@ -1,0 +1,77 @@
+@page "/klassement"
+@using TourDeFrance.Web.Services
+@inject PuntenService PuntenService
+@rendermode InteractiveServer
+
+<PageTitle>Totaal Klassement</PageTitle>
+
+<h1>🏆 Totaal Klassement</h1>
+<p class="text-muted">Totale punten voor alle deelnemers inclusief bonuspunten.</p>
+
+@if (scores == null)
+{
+    <div class="d-flex align-items-center gap-2">
+        <div class="spinner-border spinner-border-sm"></div>
+        <span>Klassement wordt berekend...</span>
+    </div>
+}
+else if (scores.Count == 0)
+{
+    <div class="alert alert-info">
+        Nog geen deelnemers of etappe-uitslagen beschikbaar. 
+        Voeg eerst een <a href="/team-invoer">team</a> in.
+    </div>
+}
+else
+{
+    <table class="table table-striped table-hover">
+        <thead class="table-dark">
+            <tr>
+                <th>#</th>
+                <th>Deelnemer</th>
+                <th class="text-end">Dagpunten</th>
+                <th class="text-end">Bonuspunten</th>
+                <th class="text-end fw-bold">Totaal</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var (score, positie) in scores.Select((s, i) => (s, i + 1)))
+            {
+                var rij = positie switch
+                {
+                    1 => "table-warning fw-bold",
+                    2 => "table-secondary fw-bold",
+                    3 => "table-danger fw-semibold",
+                    _ => ""
+                };
+                <tr class="@rij">
+                    <td>
+                        @(positie switch { 1 => "🥇", 2 => "🥈", 3 => "🥉", _ => positie.ToString() })
+                    </td>
+                    <td>@score.DeelnemerNaam</td>
+                    <td class="text-end">@score.DagPunten</td>
+                    <td class="text-end">@score.BonusPunten</td>
+                    <td class="text-end fw-bold">@score.TotaalPunten</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <button class="btn btn-outline-secondary" @onclick="Vernieuwen">🔄 Vernieuwen</button>
+}
+
+@code {
+    private List<DeelnemerScore>? scores;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Vernieuwen();
+    }
+
+    private async Task Vernieuwen()
+    {
+        scores = null;
+        await Task.Delay(100);
+        scores = await PuntenService.BerekenTotaalKlassementAsync();
+    }
+}

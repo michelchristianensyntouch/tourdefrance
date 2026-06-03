@@ -1,0 +1,326 @@
+@page "/admin"
+@using TourDeFrance.Data.Entities
+@using TourDeFrance.Web.Services
+@inject EtappeService EtappeService
+@inject RennerService RennerService
+@rendermode InteractiveServer
+
+<PageTitle>Admin – Uitslagen Invoeren</PageTitle>
+
+<h1>⚙️ Admin – Uitslagen Invoeren</h1>
+
+@if (!string.IsNullOrEmpty(succesmelding))
+{
+    <div class="alert alert-success alert-dismissible">
+        @succesmelding
+        <button type="button" class="btn-close" @onclick="() => succesmelding = string.Empty"></button>
+    </div>
+}
+@if (!string.IsNullOrEmpty(foutmelding))
+{
+    <div class="alert alert-danger alert-dismissible">
+        @foutmelding
+        <button type="button" class="btn-close" @onclick="() => foutmelding = string.Empty"></button>
+    </div>
+}
+
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <button class="nav-link @(actieveTab == "etappe" ? "active" : "")" 
+                @onclick='() => actieveTab = "etappe"'>
+            Etappe Uitslag
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(actieveTab == "eindklassement" ? "active" : "")" 
+                @onclick='() => actieveTab = "eindklassement"'>
+            Eindklassementen
+        </button>
+    </li>
+</ul>
+
+@if (actieveTab == "etappe")
+{
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Etappe Uitslag Invoeren</h5>
+            <p class="text-muted">Voer de top 15 finishers in per etappe (startnummer = positie).</p>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">Etappe:</label>
+                <select class="form-select" @bind="geselecteerdeEtappeId" @bind:after="LaadBestaandeUitslag">
+                    <option value="0">-- Kies etappe --</option>
+                    @foreach (var etappe in etappes)
+                    {
+                        <option value="@etappe.Id">
+                            Etappe @etappe.EtappeNummer 
+                            @(etappe.EindLocatie != null ? $" – {etappe.EindLocatie}" : "")
+                        </option>
+                    }
+                </select>
+            </div>
+
+            @if (geselecteerdeEtappeId > 0)
+            {
+                <div class="row">
+                    @for (int i = 0; i < 15; i++)
+                    {
+                        var pos = i;
+                        <div class="col-md-4 mb-2">
+                            <div class="input-group">
+                                <span class="input-group-text fw-bold" style="min-width: 45px;">@(pos + 1).</span>
+                                <input class="form-control" type="number" min="1" 
+                                       placeholder="Startnr"
+                                       value="@etappeStartnummers[pos]"
+                                       @onchange="async e => await EtappeRennerGewijzigd(pos, e)" />
+                                @if (etappeRenners[pos] != null)
+                                {
+                                    <span class="input-group-text text-success" style="font-size: 0.85em;">
+                                        @etappeRenners[pos]!.Achternaam
+                                    </span>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <button class="btn btn-primary mt-3" @onclick="SlaEtappeUitslagOp" disabled="@bezig">
+                    @if (bezig) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                    💾 Etappe Uitslag Opslaan
+                </button>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Eindklassementen Invoeren</h5>
+            <p class="text-muted">
+                Voer de eindposities in voor de drie truien. Gebruik startnummers van de renners.
+            </p>
+
+            <div class="row">
+                <div class="col-md-4">
+                    <h6 class="text-warning">🟡 Gele Trui (Algemeen Klassement) – top 15</h6>
+                    @for (int i = 0; i < 15; i++)
+                    {
+                        var pos = i;
+                        <div class="input-group mb-2">
+                            <span class="input-group-text" style="min-width: 45px;">@(pos + 1).</span>
+                            <input class="form-control" type="number" min="1"
+                                   placeholder="Startnr"
+                                   value="@akStartnummers[pos]"
+                                   @onchange="async e => await AKRennerGewijzigd(pos, e)" />
+                        </div>
+                    }
+                </div>
+                <div class="col-md-4">
+                    <h6 class="text-success">🟢 Groene Trui (Puntenklassement) – top 5</h6>
+                    @for (int i = 0; i < 5; i++)
+                    {
+                        var pos = i;
+                        <div class="input-group mb-2">
+                            <span class="input-group-text" style="min-width: 45px;">@(pos + 1).</span>
+                            <input class="form-control" type="number" min="1"
+                                   placeholder="Startnr"
+                                   value="@groenStartnummers[pos]"
+                                   @onchange="async e => await GroenRennerGewijzigd(pos, e)" />
+                        </div>
+                    }
+                </div>
+                <div class="col-md-4">
+                    <h6 class="text-danger">🔴 Bolletjestrui (Bergklassement) – top 5</h6>
+                    @for (int i = 0; i < 5; i++)
+                    {
+                        var pos = i;
+                        <div class="input-group mb-2">
+                            <span class="input-group-text" style="min-width: 45px;">@(pos + 1).</span>
+                            <input class="form-control" type="number" min="1"
+                                   placeholder="Startnr"
+                                   value="@bolletjesStartnummers[pos]"
+                                   @onchange="async e => await BolletjesRennerGewijzigd(pos, e)" />
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <button class="btn btn-primary mt-3" @onclick="SlaEindKlassementOp" disabled="@bezig">
+                @if (bezig) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                💾 Eindklassementen Opslaan
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Etappe> etappes = [];
+    private string actieveTab = "etappe";
+    private int geselecteerdeEtappeId = 0;
+    private string succesmelding = string.Empty;
+    private string foutmelding = string.Empty;
+    private bool bezig = false;
+
+    // Etappe uitslag velden
+    private int?[] etappeStartnummers = new int?[15];
+    private Renner?[] etappeRenners = new Renner?[15];
+
+    // Eindklassement velden
+    private int?[] akStartnummers = new int?[15];
+    private int?[] groenStartnummers = new int?[5];
+    private int?[] bolletjesStartnummers = new int?[5];
+
+    protected override async Task OnInitializedAsync()
+    {
+        etappes = await EtappeService.GetAlleEtappesAsync();
+    }
+
+    private async Task LaadBestaandeUitslag()
+    {
+        etappeStartnummers = new int?[15];
+        etappeRenners = new Renner?[15];
+
+        if (geselecteerdeEtappeId > 0)
+        {
+            var uitslagen = await EtappeService.GetEtappeUitslagenAsync(geselecteerdeEtappeId);
+            foreach (var u in uitslagen.OrderBy(u => u.Positie))
+            {
+                var idx = u.Positie - 1;
+                if (idx >= 0 && idx < 15)
+                {
+                    etappeStartnummers[idx] = u.Renner.Startnummer;
+                    etappeRenners[idx] = u.Renner;
+                }
+            }
+        }
+    }
+
+    private async Task EtappeRennerGewijzigd(int index, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var nr))
+        {
+            etappeStartnummers[index] = nr;
+            etappeRenners[index] = await RennerService.GetRennerByStartnummerAsync(nr);
+        }
+        else
+        {
+            etappeStartnummers[index] = null;
+            etappeRenners[index] = null;
+        }
+    }
+
+    private async Task AKRennerGewijzigd(int index, ChangeEventArgs e)
+    {
+        akStartnummers[index] = int.TryParse(e.Value?.ToString(), out var nr) ? nr : null;
+        await Task.CompletedTask;
+    }
+
+    private async Task GroenRennerGewijzigd(int index, ChangeEventArgs e)
+    {
+        groenStartnummers[index] = int.TryParse(e.Value?.ToString(), out var nr) ? nr : null;
+        await Task.CompletedTask;
+    }
+
+    private async Task BolletjesRennerGewijzigd(int index, ChangeEventArgs e)
+    {
+        bolletjesStartnummers[index] = int.TryParse(e.Value?.ToString(), out var nr) ? nr : null;
+        await Task.CompletedTask;
+    }
+
+    private async Task SlaEtappeUitslagOp()
+    {
+        foutmelding = string.Empty;
+        succesmelding = string.Empty;
+
+        if (geselecteerdeEtappeId == 0)
+        {
+            foutmelding = "Selecteer een etappe.";
+            return;
+        }
+
+        var ingevuld = etappeStartnummers
+            .Select((n, i) => new { Positie = i + 1, Startnummer = n })
+            .Where(x => x.Startnummer.HasValue)
+            .ToList();
+
+        if (ingevuld.Count == 0)
+        {
+            foutmelding = "Voer minimaal één startnummer in.";
+            return;
+        }
+
+        bezig = true;
+        try
+        {
+            var uitslagen = ingevuld
+                .Where(x => etappeRenners[x.Positie - 1] != null)
+                .ToDictionary(
+                    x => x.Positie,
+                    x => etappeRenners[x.Positie - 1]!.Id
+                );
+
+            await EtappeService.SlaEtappeUitslagOpAsync(geselecteerdeEtappeId, uitslagen);
+            succesmelding = "Etappe uitslag opgeslagen! ✅";
+        }
+        catch (Exception ex)
+        {
+            foutmelding = $"Fout: {ex.Message}";
+        }
+        finally
+        {
+            bezig = false;
+        }
+    }
+
+    private async Task SlaEindKlassementOp()
+    {
+        foutmelding = string.Empty;
+        succesmelding = string.Empty;
+        bezig = true;
+
+        try
+        {
+            var akRennerIds = new Dictionary<int, int>();
+            for (int i = 0; i < 15; i++)
+            {
+                if (akStartnummers[i].HasValue)
+                {
+                    var r = await RennerService.GetRennerByStartnummerAsync(akStartnummers[i]!.Value);
+                    if (r != null) akRennerIds[i + 1] = r.Id;
+                }
+            }
+
+            var groenRennerIds = new Dictionary<int, int>();
+            for (int i = 0; i < 5; i++)
+            {
+                if (groenStartnummers[i].HasValue)
+                {
+                    var r = await RennerService.GetRennerByStartnummerAsync(groenStartnummers[i]!.Value);
+                    if (r != null) groenRennerIds[i + 1] = r.Id;
+                }
+            }
+
+            var bolletjesRennerIds = new Dictionary<int, int>();
+            for (int i = 0; i < 5; i++)
+            {
+                if (bolletjesStartnummers[i].HasValue)
+                {
+                    var r = await RennerService.GetRennerByStartnummerAsync(bolletjesStartnummers[i]!.Value);
+                    if (r != null) bolletjesRennerIds[i + 1] = r.Id;
+                }
+            }
+
+            await EtappeService.SlaEindKlassementOpAsync(akRennerIds, groenRennerIds, bolletjesRennerIds);
+            succesmelding = "Eindklassementen opgeslagen! ✅";
+        }
+        catch (Exception ex)
+        {
+            foutmelding = $"Fout: {ex.Message}";
+        }
+        finally
+        {
+            bezig = false;
+        }
+    }
+}

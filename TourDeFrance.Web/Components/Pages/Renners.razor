@@ -1,0 +1,118 @@
+@page "/renners"
+@using TourDeFrance.Data.Entities
+@using TourDeFrance.Web.Services
+@inject RennerService RennerService
+@rendermode InteractiveServer
+
+<PageTitle>Renners Overzicht</PageTitle>
+
+<h1>🚴 Renners Overzicht</h1>
+
+<div class="row mb-3">
+    <div class="col-md-4">
+        <input class="form-control" placeholder="Zoek op naam of startnummer..." 
+               @bind="zoekterm" @bind:event="oninput" @bind:after="Zoek" />
+    </div>
+    <div class="col-md-4">
+        <select class="form-select" @bind="geselecteerdePloegId" @bind:after="Zoek">
+            <option value="0">Alle ploegen</option>
+            @foreach (var ploeg in ploegen)
+            {
+                <option value="@ploeg.Id">@ploeg.Naam</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-4 d-flex align-items-center">
+        <span class="text-muted">@renners.Count renner(s) gevonden</span>
+    </div>
+</div>
+
+@if (renners.Count == 0)
+{
+    <div class="alert alert-info">Geen renners gevonden.</div>
+}
+else
+{
+    <table class="table table-striped table-hover">
+        <thead class="table-dark">
+            <tr>
+                <th @onclick='() => SorteerOp("nr")' style="cursor:pointer">
+                    Nr @SortIndicator("nr")
+                </th>
+                <th @onclick='() => SorteerOp("naam")' style="cursor:pointer">
+                    Renner @SortIndicator("naam")
+                </th>
+                <th @onclick='() => SorteerOp("ploeg")' style="cursor:pointer">
+                    Ploeg @SortIndicator("ploeg")
+                </th>
+                <th>Land</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var renner in renners)
+            {
+                <tr>
+                    <td><strong>@renner.Startnummer</strong></td>
+                    <td>@renner.VolledigeNaam</td>
+                    <td>@renner.Ploeg.Naam</td>
+                    <td>@renner.Land</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Renner> renners = [];
+    private List<Ploeg> ploegen = [];
+    private string zoekterm = string.Empty;
+    private int geselecteerdePloegId = 0;
+    private string sorteerKolom = "nr";
+    private bool sorteerOplopend = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        ploegen = await RennerService.GetAllePloegen();
+        await LaadRenners();
+    }
+
+    private async Task Zoek()
+    {
+        await LaadRenners();
+    }
+
+    private async Task LaadRenners()
+    {
+        var lijst = await RennerService.GetAlleRennersAsync(
+            string.IsNullOrWhiteSpace(zoekterm) ? null : zoekterm,
+            geselecteerdePloegId == 0 ? null : geselecteerdePloegId);
+
+        renners = sorteerKolom switch
+        {
+            "naam" => sorteerOplopend
+                ? lijst.OrderBy(r => r.Achternaam).ThenBy(r => r.Voornaam).ToList()
+                : lijst.OrderByDescending(r => r.Achternaam).ToList(),
+            "ploeg" => sorteerOplopend
+                ? lijst.OrderBy(r => r.Ploeg.Naam).ToList()
+                : lijst.OrderByDescending(r => r.Ploeg.Naam).ToList(),
+            _ => sorteerOplopend
+                ? lijst.OrderBy(r => r.Startnummer).ToList()
+                : lijst.OrderByDescending(r => r.Startnummer).ToList()
+        };
+    }
+
+    private async Task SorteerOp(string kolom)
+    {
+        if (sorteerKolom == kolom)
+            sorteerOplopend = !sorteerOplopend;
+        else
+        {
+            sorteerKolom = kolom;
+            sorteerOplopend = true;
+        }
+        await LaadRenners();
+    }
+
+    private string SortIndicator(string kolom) =>
+        sorteerKolom == kolom ? (sorteerOplopend ? "▲" : "▼") : "";
+}

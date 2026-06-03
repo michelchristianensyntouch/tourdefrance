@@ -1,0 +1,82 @@
+@page "/etappe-uitslagen"
+@using TourDeFrance.Data.Entities
+@using TourDeFrance.Web.Services
+@inject EtappeService EtappeService
+@inject PuntenService PuntenService
+@rendermode InteractiveServer
+
+<PageTitle>Etappe Uitslagen</PageTitle>
+
+<h1>📊 Etappe Uitslagen per Deelnemer</h1>
+
+<div class="row mb-3">
+    <div class="col-md-4">
+        <label class="form-label fw-bold">Selecteer etappe:</label>
+        <select class="form-select" @bind="geselecteerdeEtappeId" @bind:after="LaadScores">
+            <option value="0">-- Kies een etappe --</option>
+            @foreach (var etappe in etappes)
+            {
+                <option value="@etappe.Id">
+                    Etappe @etappe.EtappeNummer 
+                    @(etappe.StartLocatie != null ? $" – {etappe.StartLocatie}" : "")
+                    @(etappe.EindLocatie != null ? $" → {etappe.EindLocatie}" : "")
+                </option>
+            }
+        </select>
+    </div>
+</div>
+
+@if (geselecteerdeEtappeId == 0)
+{
+    <div class="alert alert-info">Selecteer een etappe om de uitslagen te zien.</div>
+}
+else if (scores.Count == 0)
+{
+    <div class="alert alert-warning">
+        Nog geen etappe-uitslag ingevoerd voor deze etappe. 
+        Ga naar <a href="/admin">Admin</a> om uitslagen in te voeren.
+    </div>
+}
+else
+{
+    <table class="table table-striped table-hover">
+        <thead class="table-dark">
+            <tr>
+                <th>#</th>
+                <th>Deelnemer</th>
+                <th class="text-end">Punten deze etappe</th>
+                <th class="text-end">Cumulatief totaal</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var (score, positie) in scores.Select((s, i) => (s, i + 1)))
+            {
+                <tr class="@(positie == 1 ? "table-warning fw-bold" : "")">
+                    <td>@positie</td>
+                    <td>@score.DeelnemerNaam</td>
+                    <td class="text-end">@score.PuntenDezeEtappe</td>
+                    <td class="text-end">@score.CumulatiefTotaal</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Etappe> etappes = [];
+    private List<EtappeDeelnemerScore> scores = [];
+    private int geselecteerdeEtappeId = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        etappes = await EtappeService.GetAlleEtappesAsync();
+    }
+
+    private async Task LaadScores()
+    {
+        if (geselecteerdeEtappeId > 0)
+            scores = await PuntenService.BerekenEtappeScoresAsync(geselecteerdeEtappeId);
+        else
+            scores = [];
+    }
+}
