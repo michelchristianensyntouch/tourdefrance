@@ -1,7 +1,78 @@
 ﻿@page "/"
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Tour de France Poule</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="container py-4">
+    <div class="text-center mb-5">
+        <h1 class="display-4">🚴 Tour de France Poule</h1>
+        <p class="lead">Stel jouw droomteam samen en strijd om de eer!</p>
+    </div>
 
-Welcome to your new app.
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="display-1 mb-3">🚴</div>
+                    <h5 class="card-title">Renners</h5>
+                    <p class="card-text">Bekijk alle deelnemende renners met hun startnummer en ploeg.</p>
+                    <a href="/renners" class="btn btn-primary">Renners bekijken</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="display-1 mb-3">📝</div>
+                    <h5 class="card-title">Mijn Team</h5>
+                    <p class="card-text">Stel jouw team van 15 renners samen en voorspel het eindpodium.</p>
+                    <a href="/team-invoer" class="btn btn-success">Team samenstellen</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="display-1 mb-3">🏆</div>
+                    <h5 class="card-title">Klassement</h5>
+                    <p class="card-text">Zie wie er op kop staat in de poule na elke etappe.</p>
+                    <a href="/klassement" class="btn btn-warning">Klassement bekijken</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mt-2">
+        <div class="col-md-6">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="display-1 mb-3">📊</div>
+                    <h5 class="card-title">Etappe Uitslagen</h5>
+                    <p class="card-text">Bekijk de punten per deelnemer voor elke afzonderlijke etappe.</p>
+                    <a href="/etappe-uitslagen" class="btn btn-info text-white">Uitslagen bekijken</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="display-1 mb-3">⚙️</div>
+                    <h5 class="card-title">Admin</h5>
+                    <p class="card-text">Voer etappe-uitslagen en eindklassementen in.</p>
+                    <a href="/admin" class="btn btn-secondary">Admin</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-4 bg-light">
+        <div class="card-body">
+            <h5>📋 Hoe werkt de poule?</h5>
+            <ul>
+                <li>Stel een team samen van <strong>15 renners</strong> via hun startnummer.</li>
+                <li>De eerste 3 renners zijn jouw <strong>podiumvoorspelling</strong>.</li>
+                <li>Per etappe scoor je punten voor de top 15 finishers in jouw team (1e = 15 pts, 15e = 1 pt).</li>
+                <li>Na de Tour zijn er bonuspunten voor de <strong>Gele Trui</strong> (max 75 pts), <strong>Groene Trui</strong> (max 25 pts) en <strong>Bolletjestrui</strong> (max 25 pts).</li>
+            </ul>
+        </div>
+    </div>
+</div>
