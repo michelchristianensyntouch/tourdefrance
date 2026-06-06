@@ -1,0 +1,83 @@
+@page "/admin/login"
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
+@using System.Security.Claims
+@inject IConfiguration Config
+@inject NavigationManager Nav
+@inject IHttpContextAccessor HttpContextAccessor
+
+<PageTitle>Admin Login</PageTitle>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title text-center mb-4">⚙️ Admin Login</h2>
+
+                    @if (FoutMelding)
+                    {
+                        <div class="alert alert-danger">
+                            Onjuist wachtwoord. Probeer opnieuw.
+                        </div>
+                    }
+
+                    <form method="post" @formname="AdminLogin">
+                        <AntiforgeryToken />
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Wachtwoord</label>
+                            <input type="password" class="form-control" name="LoginForm.Password"
+                                   placeholder="Voer het admin wachtwoord in" autocomplete="current-password" />
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Inloggen</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "error")]
+    public bool FoutMelding { get; set; }
+
+    [SupplyParameterFromForm(FormName = "AdminLogin")]
+    public LoginModel? LoginForm { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (LoginForm?.Password is null) return;
+
+        var adminPassword = Config["Admin:Password"];
+        if (string.IsNullOrEmpty(adminPassword))
+        {
+            FoutMelding = true;
+            return;
+        }
+
+        if (LoginForm.Password == adminPassword)
+        {
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.Name, "admin"),
+                new Claim(ClaimTypes.Role, "Admin")
+            };
+            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            await HttpContextAccessor.HttpContext!.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                new ClaimsPrincipal(identity));
+            Nav.NavigateTo("/admin", forceLoad: true);
+        }
+        else
+        {
+            Nav.NavigateTo("/admin/login?error=true", forceLoad: true);
+        }
+    }
+
+    public class LoginModel
+    {
+        public string? Password { get; set; }
+    }
+}

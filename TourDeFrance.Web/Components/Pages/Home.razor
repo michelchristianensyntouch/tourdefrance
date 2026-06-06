@@ -52,16 +52,18 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body text-center">
-                    <div class="display-1 mb-3">⚙️</div>
-                    <h5 class="card-title">Admin</h5>
-                    <p class="card-text">Voer etappe-uitslagen en eindklassementen in.</p>
-                    <a href="/admin" class="btn btn-secondary">Admin</a>
+        <AuthorizeView Roles="Admin">
+            <div class="col-md-6">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body text-center">
+                        <div class="display-1 mb-3">⚙️</div>
+                        <h5 class="card-title">Admin</h5>
+                        <p class="card-text">Voer etappe-uitslagen en eindklassementen in.</p>
+                        <a href="/admin" class="btn btn-secondary">Admin</a>
+                    </div>
                 </div>
             </div>
-        </div>
+        </AuthorizeView>
     </div>
 
     <div class="card mt-4 bg-light">
