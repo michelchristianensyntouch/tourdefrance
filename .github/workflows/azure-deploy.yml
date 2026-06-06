@@ -1,0 +1,120 @@
+name: CI/CD – Build and Deploy to Azure
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+env:
+  RESOURCE_GROUP: tourdefrance-rg
+  LOCATION: westeurope
+  APP_NAME: tourdefrance          # must match appName in main.bicepparam
+  SQL_ADMIN_LOGIN: sqladmin
+
+jobs:
+  # ── Build and test ────────────────────────────────────────────────────────────
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore -c Release
+
+      - name: Test
+        run: dotnet test --no-build -c Release --logger trx --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/
+
+  # ── Deploy (only on push to main/master or manual trigger) ───────────────────
+  deploy:
+    name: Deploy to Azure
+    if: github.event_name != 'pull_request'
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    environment: production
+    outputs:
+      acr-login-server: ${{ steps.bicep.outputs.acrLoginServer }}
+      web-app-name: ${{ steps.bicep.outputs.webAppName }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Ensure resource group exists
+      - name: Create resource group
+        run: |
+          az group create \
+            --name ${{ env.RESOURCE_GROUP }} \
+            --location ${{ env.LOCATION }} \
+            --output none
+
+      # Deploy Bicep infrastructure (idempotent)
+      - name: Deploy infrastructure
+        id: bicep
+        run: |
+          output=$(az deployment group create \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --template-file infra/main.bicep \
+            --parameters infra/main.bicepparam \
+            --parameters sqlAdminPassword=${{ secrets.SQL_ADMIN_PASSWORD }} \
+            --parameters containerImageTag=${{ github.sha }} \
+            --query 'properties.outputs' \
+            --output json)
+
+          echo "acrLoginServer=$(echo $output | jq -r '.acrLoginServer.value')" >> $GITHUB_OUTPUT
+          echo "webAppName=$(echo $output | jq -r '.webAppName.value')" >> $GITHUB_OUTPUT
+
+      # Build and push Docker image to ACR
+      - name: Login to ACR
+        run: az acr login --name $(echo "${{ steps.bicep.outputs.acr-login-server }}" | cut -d'.' -f1)
+
+      - name: Build and push Docker image
+        run: |
+          ACR_IMAGE="${{ steps.bicep.outputs.acr-login-server }}/tourdefrance"
+          docker build -t "${ACR_IMAGE}:${{ github.sha }}" .
+          docker push "${ACR_IMAGE}:${{ github.sha }}"
+          docker tag "${ACR_IMAGE}:${{ github.sha }}" "${ACR_IMAGE}:latest"
+          docker push "${ACR_IMAGE}:latest"
+
+      # Update App Service to use the newly pushed image
+      - name: Deploy container to App Service
+        run: |
+          az webapp config container set \
+            --name ${{ steps.bicep.outputs.web-app-name }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --container-image-name "${{ steps.bicep.outputs.acr-login-server }}/tourdefrance:${{ github.sha }}" \
+            --output none
+
+          az webapp restart \
+            --name ${{ steps.bicep.outputs.web-app-name }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --output none
+
+      - name: Print app URL
+        run: |
+          az webapp show \
+            --name ${{ steps.bicep.outputs.web-app-name }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query defaultHostName \
+            --output tsv | xargs -I{} echo "Deployed to: https://{}"

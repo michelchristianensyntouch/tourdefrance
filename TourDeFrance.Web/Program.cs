@@ -5,8 +5,28 @@ using TourDeFrance.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
+
+var databaseProvider = builder.Configuration["DatabaseProvider"] ?? "Sqlite";
+
 builder.Services.AddDbContext<TourDeFranceDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+{
+    if (databaseProvider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
+    {
+        options.UseSqlServer(connectionString,
+            x => x.MigrationsAssembly("TourDeFrance.Data.SqlServer"));
+    }
+    else if (databaseProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
+    {
+        options.UseSqlite(connectionString);
+    }
+    else
+    {
+        throw new InvalidOperationException(
+            $"Unsupported DatabaseProvider '{databaseProvider}'. Valid values are 'Sqlite' and 'SqlServer'.");
+    }
+});
 
 builder.Services.AddScoped<RennerService>();
 builder.Services.AddScoped<DeelnemerService>();
@@ -31,10 +51,9 @@ using (var scope = app.Services.CreateScope())
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
+    app.UseHttpsRedirection();
 }
-// app.UseHttpsRedirection(); // Disabled: app runs on HTTP in development
 
 app.UseAntiforgery();
 
